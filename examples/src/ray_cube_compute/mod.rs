@@ -72,6 +72,8 @@ fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
 struct Uniforms {
     view_inverse: Mat4,
     proj_inverse: Mat4,
+    time: f32,
+    padding: [f32; 3],
 }
 
 #[inline]
@@ -132,6 +134,7 @@ struct Example {
     blit_pipeline: wgpu::RenderPipeline,
     blit_bind_group: wgpu::BindGroup,
     start_inst: Instant,
+    uniforms: Uniforms,
 }
 
 impl crate::framework::Example for Example {
@@ -207,6 +210,8 @@ impl crate::framework::Example for Example {
             Uniforms {
                 view_inverse: view.inverse(),
                 proj_inverse: proj.inverse(),
+                time: 0.0,
+                padding: [0.0; 3],
             }
         };
 
@@ -399,6 +404,7 @@ impl crate::framework::Example for Example {
             blit_pipeline,
             blit_bind_group,
             start_inst,
+            uniforms
         }
     }
 
@@ -419,6 +425,8 @@ impl crate::framework::Example for Example {
 
         let anim_time = self.start_inst.elapsed().as_secs_f64() as f32;
 
+        self.uniforms.time = anim_time;
+        
         self.tlas_package[0].as_mut().unwrap().transform =
             affine_to_rows(&Affine3A::from_rotation_translation(
                 Quat::from_euler(
@@ -434,6 +442,32 @@ impl crate::framework::Example for Example {
                 },
             ));
 
+        let compute_bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
+
+        self.uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[self.uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+        self.compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &compute_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&self.rt_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.uniform_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::AccelerationStructure(&self.tlas_package.tlas()),
+                },
+            ],
+        });
+       
         let mut encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 

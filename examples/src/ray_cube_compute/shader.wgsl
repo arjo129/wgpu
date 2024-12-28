@@ -44,6 +44,7 @@ struct RayIntersection {
 struct Uniforms {
     view_inv: mat4x4<f32>,
     proj_inv: mat4x4<f32>,
+    times: f32,
 };
 
 @group(0) @binding(0)
@@ -64,7 +65,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let in_uv = pixel_center/vec2<f32>(target_size.xy);
 	let d = in_uv * 2.0 - 1.0;
 
-	let origin = (uniforms.view_inv * vec4<f32>(0.0,0.0,0.0,1.0)).xyz;
+	let origin = (uniforms.view_inv * vec4<f32>(0.0,0.0,0.0,1.0)).xyz + vec3f(0,0,uniforms.times);
 	let temp = uniforms.proj_inv * vec4<f32>(d.x, d.y, 1.0, 1.0);
 	let direction = (uniforms.view_inv * vec4<f32>(normalize(temp.xyz), 0.0)).xyz;
 
